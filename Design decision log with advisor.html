@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Design decision log with advisor</title>
+<style>
+:root{--bg:#fff;--card:#EEF1F3;--ink:#1F2A33;--ink2:#2E3D4A;--mute:#5B7083;--red:#C8452D;--gold:#D9A441;--line:#cfd6db;--field:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1F2A33;--card:#2E3D4A;--ink:#EEF1F3;--ink2:#EEF1F3;--mute:#8A9BA8;--line:#46586a;--field:#1F2A33}}
+:root[data-theme="dark"]{--bg:#1F2A33;--card:#2E3D4A;--ink:#EEF1F3;--ink2:#EEF1F3;--mute:#8A9BA8;--line:#46586a;--field:#1F2A33}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Calibri,Carlito,"Segoe UI",Arial,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:28px 18px 48px}
+h1,h2{font-family:Cambria,"Noto Serif",Georgia,serif;margin:0}
+h1{font-size:clamp(26px,5vw,36px);line-height:1.15}
+h2{font-size:19px;margin-bottom:10px}
+.lead{color:var(--mute);max-width:64ch;margin:8px 0 20px}
+.panel{background:var(--card);border-radius:10px;padding:18px}
+form{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:700}
+.wide{grid-column:1/-1}
+select,textarea,input{font:inherit;font-weight:400;font-size:15px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--ink);width:100%}
+textarea{min-height:64px;resize:vertical}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font:inherit;font-weight:700;font-size:14px;padding:10px 16px;border-radius:8px;border:2px solid var(--ink2);background:transparent;color:var(--ink);cursor:pointer}
+button.p{background:var(--red);border-color:var(--red);color:#fff}
+button.x{padding:4px 10px;font-size:12px;border-color:var(--line);font-weight:400}
+.grid{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-top:16px;align-items:start}
+.entry{display:grid;grid-template-columns:34px 1fr auto;gap:10px;padding:12px 0;border-top:1px solid var(--line)}
+.entry:first-of-type{border-top:0}
+.num{width:30px;height:30px;border-radius:6px;background:var(--ink2);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:13px}
+.entry.loop .num{background:var(--red);color:#fff}
+.entry b{display:block}.meta{font-size:13px;color:var(--mute)}
+.note{margin:2px 0 0;font-size:14px}
+.bar{display:grid;grid-template-columns:26px 1fr 26px;gap:8px;align-items:center;font-size:13px;margin:0 0 6px}
+.bar i{display:block;height:12px;border-radius:4px;background:var(--ink2);min-width:0}
+.bar.t i{background:var(--red)}
+.bar .tr{background:var(--line);border-radius:4px;height:12px}
+.sum{font-size:14px;margin:0 0 12px}
+.empty{color:var(--mute);margin:0}
+.fine{color:var(--mute);font-size:13px;margin-top:20px;max-width:72ch}
+.adv{margin-top:16px}
+.next{margin:0 0 12px;font-size:14px}
+.a{border-left:5px solid var(--mute);background:var(--bg);border-radius:6px;padding:10px 14px;margin:0 0 10px}
+.a.high{border-color:var(--red)}.a.med{border-color:var(--gold)}
+.a h3{font-size:15px;margin:0 0 4px}
+.a .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);margin-right:6px}
+.a p{margin:2px 0;font-size:14px}
+.a p b{font-weight:700}
+@media(max-width:760px){.grid{grid-template-columns:1fr}form{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<h1>Design decision log</h1>
+<p class="lead">Record each judgement you make while working with an AI image tool. Tag it to a checkpoint and a criterion, then see which parts of the process you used and what the advisor suggests you reconsider.</p>
+
+<section class="panel">
+<h2>Add a decision</h2>
+<form id="f">
+  <label>Checkpoint<select id="cp"></select></label>
+  <label>What you did<select id="act"></select></label>
+  <label>Criterion you applied<select id="cr"></select></label>
+  <label class="wide">Note (what you saw, and why you decided)<textarea id="note" placeholder="e.g. Façade drifted from our usual proportions, so I rewrote the prompt."></textarea></label>
+  <div class="row wide"><button class="p" type="submit">Add to log</button><span class="meta" id="msg" role="status"></span></div>
+</form>
+</section>
+
+<div class="grid">
+  <section class="panel"><h2>Log</h2><div id="log"></div>
+    <div class="row" style="margin-top:14px"><button id="copy" type="button">Copy as table</button><button id="clear" type="button">Clear log</button></div>
+  </section>
+  <section class="panel"><h2>What it shows</h2><p class="sum" id="sum"></p><div id="bars"></div></section>
+</div>
+
+<section class="panel adv">
+  <h2>Advisor: points to reconsider</h2>
+  <p class="next" id="next"></p>
+  <div id="adv"></div>
+  <div class="row" style="margin-top:8px"><button id="copyadv" type="button">Copy advice</button></div>
+</section>
+
+<p class="fine">The log stays in this browser only and is not sent anywhere. Do not enter names, client details or anything identifying. To keep a record, use Copy as table and paste it into a spreadsheet or document. Checkpoints come from the dissertation’s twelve-checkpoint model; a loop is counted whenever you return to the same checkpoint or an earlier one. The advisor uses fixed rules written from that model. It reads only what you logged, so its points are prompts for reflection, not verdicts, and the model itself is a proposal still to be tested.</p>
+</main>
+<script>
+const CP=['Formulate an initial prompt','Decide it expresses design intent','Revise before generating','Review the generated batch','Discard unsuitable images','Identify images with potential','Formal coherence and stylistic continuity','Contextual, programmatic or spatial plausibility','Client, stakeholder or participatory needs','Rework manually or by prompt','Return to prompt revision','Carry forward, or not'];
+const ST=['Prompt','Review','Test','Decide'];
+const ACT=['Kept','Discarded','Revised','Re-prompted','Reworked by hand','Carried forward'];
+const CR=['None applied','Formal coherence and signature','Project intent','Structural and spatial plausibility','Contextual appropriateness','Stakeholder legibility'];
+const CRISK=[
+ '',
+ ['Formal coherence and signature','The design may drift from the studio’s language without anyone noticing.','Check a kept image against your recognisable language (checkpoint 7).'],
+ ['Project intent','Images may look good but answer a different brief.','Compare an image with the stated programme and aims (checkpoints 2 and 6).'],
+ ['Structural and spatial plausibility','A form may be attractive but hard or impossible to build or use.','Test an image for structure, circulation and scale (checkpoint 8).'],
+ ['Contextual appropriateness','The image may ignore site, climate, neighbours or local rules.','Test an image against the site and context (checkpoint 8).'],
+ ['Stakeholder legibility','A client or participant may be unable to read or respond to the image.','Show an image to someone outside the team (checkpoint 9).']
+];
+const NEXT=['Check that the prompt expresses design intent (checkpoint 2).','Revise the prompt before generating (checkpoint 3), or generate and review the batch (checkpoint 4).','Generate, then review the batch (checkpoint 4).','Discard unsuitable images (checkpoint 5).','Identify images with potential (checkpoint 6).','Test formal coherence (checkpoint 7).','Test plausibility (checkpoint 8).','Test stakeholder needs (checkpoint 9).','Rework the image (checkpoint 10), or decide whether to carry it forward (checkpoint 12).','Return to prompt revision (checkpoint 11), or retest at checkpoints 7 to 9.','Generate again and review the new batch (checkpoint 4).','This image is decided. Start the next one at checkpoint 1.'];
+const KEY='checkpoint-decision-log-v1';
+const $=id=>document.getElementById(id);
+let E=[];
+try{E=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){E=[]}
+if(!Array.isArray(E))E=[];
+E=E.filter(e=>e&&Number.isInteger(e.cp)&&e.cp>=0&&e.cp<12&&e.act>=0&&e.act<6&&e.cr>=0&&e.cr<6).map(e=>({cp:e.cp,act:e.act,cr:e.cr,note:String(e.note||'')}));
+function save(){try{localStorage.setItem(KEY,JSON.stringify(E))}catch(e){}}
+function fill(el,arr,num){el.innerHTML=arr.map((t,i)=>'<option value="'+i+'">'+(num?(i+1)+'. ':'')+t+'</option>').join('')}
+fill($('cp'),CP,true);fill($('act'),ACT);fill($('cr'),CR);
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function isLoop(i){return i>0&&E[i].cp<=E[i-1].cp}
+
+let ADV=[];
+function advise(){
+  const n=E.length,out=[];
+  const cnt=Array(12).fill(0),crc=Array(6).fill(0);
+  E.forEach(e=>{cnt[e.cp]++;crc[e.cr]++});
+  const loops=E.filter((e,i)=>isLoop(i)).length;
+  const test=cnt[6]+cnt[7]+cnt[8],review=cnt[3]+cnt[4]+cnt[5];
+  const carried=E.some(e=>e.cp===11||e.act===5);
+  const add=(lvl,t,why,doit)=>out.push({lvl,t,why,doit});
+  if(carried&&!test)add('high','Carried forward without a testing checkpoint','Nothing is logged at checkpoints 7 to 9, so no image was checked against formal language, plausibility or stakeholder needs before moving on. The risk is drift from the studio’s language, an unbuildable form, or a client who cannot read the image.','Log at least one check at checkpoint 7, 8 or 9 before carrying an image forward.');
+  if((test||carried)&&!review)add('med','No batch review logged','Decisions appear at later stages but none at checkpoints 4 to 6. Without a recorded review, it is unclear how an image was picked from the batch.','Record how you reviewed the batch, what you discarded and why.');
+  const du=E.filter(e=>(e.act===1||e.cp===4)&&e.cr===0).length;
+  if(du)add('med',du+(du===1?' discard has':' discards have')+' no criterion','The reason an image was dropped is unrecorded. Sources describe very little about what makes one image pass and another fail, so this is the part most worth capturing.','Re-tag each discard with the criterion that decided it, or write the reason in the note.');
+  const tn=E.filter(e=>e.cp>=6&&e.cp<=8&&e.cr===0).length;
+  if(tn)add('med',tn+(tn===1?' test entry has':' test entries have')+' no criterion','A test was logged without saying what it tested against, so it cannot be told apart from a general impression.','Name the criterion each test applied.');
+  if(n>=4){
+    const miss=[1,2,3,4,5].filter(c=>!crc[c]);
+    miss.forEach(c=>add(carried&&(c===3||c===1)?'med':'low','Criterion not applied: '+CRISK[c][0],'Risk: '+CRISK[c][1],'Consider: '+CRISK[c][2]));
+  }
+  if(cnt[0]&&!cnt[1]&&!cnt[2])add('low','Prompt not checked against intent','Checkpoint 1 is logged but not 2 or 3. The prompt may not carry the design intent, and the batch will then be judged against a goal that was never stated.','Log whether the prompt expresses the brief and whether it needed revising.');
+  if(n>=4&&loops===0)add('low','No loops yet','Every entry moves forward without returning. That may mean the first batch was accepted, or that returns were not logged.','Check whether you went back to the prompt at any point and log it.');
+  if(n>=5&&(loops>=3&&loops/n>=0.4||cnt[10]>=3))add('med','Heavy looping','You keep returning to earlier checkpoints. This can mean the intent was never settled at checkpoint 2, or that the criteria used to judge images keep changing.','Restate the design intent in one sentence, then choose which criterion decides the next round.');
+  const rank={high:0,med:1,low:2};
+  out.sort((a,b)=>rank[a.lvl]-rank[b.lvl]);
+  return out;
+}
+
+function render(){
+  const L=$('log');
+  L.innerHTML=E.length?E.map((e,i)=>'<div class="entry'+(isLoop(i)?' loop':'')+'"><span class="num">'+(i+1)+'</span><div><b>'+(e.cp+1)+'. '+esc(CP[e.cp])+'</b><span class="meta">'+ST[Math.floor(e.cp/3)]+' stage · '+esc(ACT[e.act])+' · '+esc(CR[e.cr])+(isLoop(i)?' · loop':'')+'</span>'+(e.note?'<p class="note">'+esc(e.note)+'</p>':'')+'</div><button class="x" type="button" data-i="'+i+'" aria-label="Delete entry '+(i+1)+'">Delete</button></div>').join(''):'<p class="empty">No decisions yet. Add your first one above.</p>';
+  const cnt=Array(12).fill(0);E.forEach(e=>cnt[e.cp]++);
+  const max=Math.max(1,...cnt),loops=E.filter((e,i)=>isLoop(i)).length;
+  const missed=cnt.map((c,i)=>c?0:i+1).filter(Boolean);
+  $('sum').textContent=E.length?E.length+' decisions, '+loops+(loops===1?' loop':' loops')+'. '+(missed.length?'Not yet used: checkpoint'+(missed.length>1?'s ':' ')+missed.join(', ')+'.':'Every checkpoint used.'):'Your coverage appears here once you add decisions.';
+  $('bars').innerHTML=cnt.map((c,i)=>'<div class="bar'+(i>=6&&i<9?' t':'')+'"><span>'+(i+1)+'</span><span class="tr"><i style="width:'+(c/max*100)+'%"></i></span><span>'+c+'</span></div>').join('');
+  ADV=advise();
+  $('next').innerHTML=E.length?'<b>Likely next step:</b> '+esc(NEXT[E[E.length-1].cp]):'Add decisions and the advisor will point out gaps, risks and a likely next step.';
+  const lab={high:'Priority',med:'Worth checking',low:'Consider'};
+  $('adv').innerHTML=!E.length?'':ADV.length?ADV.map(a=>'<div class="a '+a.lvl+'"><h3><span class="tag">'+lab[a.lvl]+'</span>'+esc(a.t)+'</h3><p>'+esc(a.why)+'</p><p><b>What to do:</b> '+esc(a.doit)+'</p></div>').join(''):'<p class="empty">The rules found no gaps in what you logged. That does not show the process is sound, only that these checks were met.</p>';
+}
+$('f').addEventListener('submit',ev=>{
+  ev.preventDefault();
+  E.push({cp:+$('cp').value,act:+$('act').value,cr:+$('cr').value,note:$('note').value.trim().slice(0,400)});
+  save();$('note').value='';$('msg').textContent='Added as decision '+E.length+'.';render();
+});
+$('log').addEventListener('click',ev=>{
+  const b=ev.target.closest('button[data-i]');if(!b)return;
+  E.splice(+b.dataset.i,1);save();render();
+});
+$('clear').onclick=function(){
+  if(this.dataset.arm){E=[];save();delete this.dataset.arm;this.textContent='Clear log';render();return}
+  this.dataset.arm=1;this.textContent='Press again to clear';
+  setTimeout(()=>{delete this.dataset.arm;this.textContent='Clear log'},3000);
+};
+function copyText(btn,t,label){
+  const done=m=>{btn.textContent=m;setTimeout(()=>{btn.textContent=label},2500)};
+  try{navigator.clipboard.writeText(t).then(()=>done('Copied'),()=>done('Copy blocked'))}catch(e){done('Copy blocked')}
+}
+$('copy').onclick=function(){
+  const head=['No.','Checkpoint','Stage','Action','Criterion','Loop','Note'].join('\t');
+  const rows=E.map((e,i)=>[i+1,(e.cp+1)+'. '+CP[e.cp],ST[Math.floor(e.cp/3)],ACT[e.act],CR[e.cr],isLoop(i)?'yes':'no',e.note.replace(/[\t\r\n]+/g,' ')].join('\t'));
+  copyText(this,[head,...rows].join('\n'),'Copy as table');
+};
+$('copyadv').onclick=function(){
+  const t=ADV.length?ADV.map((a,i)=>(i+1)+'. '+a.t+'\n   '+a.why+'\n   What to do: '+a.doit).join('\n\n'):'No gaps found by the rules.';
+  copyText(this,t,'Copy advice');
+};
+render();
+</script>
+</body>
+</html>
